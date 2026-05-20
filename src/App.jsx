@@ -255,8 +255,15 @@ export default function App() {
   const [activePage, setActivePage] = useState('dashboard')
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
   useEffect(() => { fetchAll() }, [])
+
+useEffect(() => {
+  const handleResize = () => setIsMobile(window.innerWidth < 768)
+  window.addEventListener('resize', handleResize)
+  return () => window.removeEventListener('resize', handleResize)
+}, [])
 
   async function fetchAll() {
     setLoading(true)
@@ -303,10 +310,12 @@ export default function App() {
       <style>{css}</style>
       <div style={{ display: 'flex', height: '100vh', background: theme.bg, color: theme.text, overflow: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
 
-        {/* Desktop Sidebar */}
-        <div className="desktop-sidebar" style={{ display: 'flex', flexShrink: 0 }}>
-          <Sidebar activePage={activePage} setActivePage={setActivePage} pending={pending} properties={properties} income={income} proposals={proposals} />
-        </div>
+        {/* Desktop Sidebar — hidden on mobile */}
+{!isMobile && (
+  <div style={{ display: 'flex', flexShrink: 0 }}>
+    <Sidebar activePage={activePage} setActivePage={setActivePage} pending={pending} properties={properties} income={income} proposals={proposals} />
+  </div>
+)}
 
         {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
@@ -324,7 +333,7 @@ export default function App() {
           {/* Topbar */}
           <div style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', borderBottom: `1px solid ${theme.border}`, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'sticky', top: 0, zIndex: 5 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button className="hamburger" onClick={() => setSidebarOpen(true)} style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.15)', color: theme.accent, fontSize: 18, cursor: 'pointer', borderRadius: 9, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>☰</button>
+              <button onClick={() => setSidebarOpen(true)} style={{ display: isMobile ? 'flex' : 'none', background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.15)', color: theme.accent, fontSize: 18, cursor: 'pointer', borderRadius: 9, width: 38, height: 38, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>☰</button> style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.15)', color: theme.accent, fontSize: 18, cursor: 'pointer', borderRadius: 9, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>☰</button>
               <div>
                 <div style={{ fontSize: 17, fontWeight: 900, color: theme.text, letterSpacing: -0.5, display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span>{nav.find(n => n.id === activePage)?.icon}</span>
