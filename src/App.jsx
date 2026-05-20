@@ -255,14 +255,14 @@ export default function App() {
   const [activePage, setActivePage] = useState('dashboard')
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(false)
 
-  useEffect(() => { fetchAll() }, [])
-
-useEffect(() => {
-  const handleResize = () => setIsMobile(window.innerWidth < 768)
-  window.addEventListener('resize', handleResize)
-  return () => window.removeEventListener('resize', handleResize)
+  useEffect(() => { 
+  fetchAll() 
+  const checkMobile = () => setIsMobile(window.innerWidth < 768)
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+  return () => window.removeEventListener('resize', checkMobile)
 }, [])
 
   async function fetchAll() {
