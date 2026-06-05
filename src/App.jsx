@@ -134,6 +134,7 @@ export default function App() {
   const [properties, setProperties] = useState([])
   const [proposals, setProposals] = useState([])
   const [transactions, setTransactions] = useState([])
+  const [maintenance, setMaintenance] = useState([])
   const [activePage, setActivePage] = useState('dashboard')
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -144,14 +145,16 @@ export default function App() {
 
   async function fetchAll() {
     setLoading(true)
-    const [p, pr, tx] = await Promise.all([
+    const [p, pr, tx, mx] = await Promise.all([
       supabase.from('properties').select('*'),
       supabase.from('pricing_proposals').select('*'),
       supabase.from('transactions').select('*'),
+    supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }),
     ])
     setProperties(p.data || [])
     setProposals(pr.data || [])
     setTransactions(tx.data || [])
+    setMaintenance(mx.data || [])
     setLoading(false)
   }
 
@@ -179,6 +182,7 @@ export default function App() {
     { id: 'properties', label: 'Properties', icon: '🏠', desc: `${properties.length} active` },
     { id: 'income', label: 'Income & Tax', icon: '💰', desc: income > 0 ? `$${income.toLocaleString()}` : 'No data yet' },
     { id: 'proposals', label: 'Proposals', icon: '📈', desc: `${pending.length} pending` },
+    { id: 'maintenance', label: 'Maintenance', icon: '🔧', desc: `${maintenance.filter(m => m.status === 'open').length} open` },
   ]
 
   function navigate(id) {
@@ -376,6 +380,21 @@ export default function App() {
                     </SectionCard>
                   </div>
 
+                 <SectionCard title="Maintenance Requests" icon="🔧" right={<span onClick={() => setActivePage('maintenance')} style={{ fontSize: 12, color: theme.accent, fontWeight: 600, cursor: 'pointer' }}>View all →</span>}>
+  {maintenance.filter(m => m.status !== 'resolved').length === 0 ? (
+    <EmptyState icon="🔧" title="No open requests" sub="Tenant maintenance requests will appear here automatically" />
+  ) : maintenance.filter(m => m.status !== 'resolved').slice(0, 3).map((m, i) => (
+    <div key={m.id} onClick={() => setActivePage('maintenance')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: i < 2 ? `1px solid ${theme.borderLight}` : 'none', cursor: 'pointer', gap: 10 }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.issue}</div>
+        <div style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>{new Date(m.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+      </div>
+      <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0, background: m.priority === 'urgent' ? theme.redLight : m.status === 'in_progress' ? '#EFF6FF' : theme.amberLight, color: m.priority === 'urgent' ? theme.red : m.status === 'in_progress' ? theme.accent : theme.amber }}>
+        {m.priority === 'urgent' ? '🚨 Urgent' : m.status === 'in_progress' ? '↻ In Progress' : '⏳ Open'}
+      </span>
+    </div>
+  ))}
+</SectionCard>
                   <SectionCard title="Financial Snapshot" icon="💎">
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, paddingTop: 4 }}>
                       {[
@@ -578,7 +597,64 @@ export default function App() {
                   ))}
                 </div>
               )}
+{/* MAINTENANCE */}
+{activePage === 'maintenance' && (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+      {[
+        { label: 'Open', value: maintenance.filter(m => m.status === 'open').length, color: theme.red },
+        { label: 'In Progress', value: maintenance.filter(m => m.status === 'in_progress').length, color: theme.amber },
+        { label: 'Resolved', value: maintenance.filter(m => m.status === 'resolved').length, color: theme.green },
+        { label: 'Total', value: maintenance.length, color: theme.accent },
+      ].map(card => (
+        <div key={card.label} style={{ background: theme.surface, borderRadius: 16, padding: '16px 18px', border: `1px solid ${theme.border}`, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 12 }}>{card.label}</div>
+          <div style={{ fontSize: 28, fontWeight: 900, color: card.color }}>{card.value}</div>
+        </div>
+      ))}
+    </div>
 
+    {maintenance.length === 0 ? (
+      <div style={{ background: theme.surface, borderRadius: 18, border: `1px solid ${theme.border}` }}>
+        <div style={{ padding: '40px 20px', textAlign: 'center', color: theme.textMuted }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🔧</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: theme.textSecondary, marginBottom: 6 }}>No maintenance requests</div>
+          <div style={{ fontSize: 12, lineHeight: 1.7 }}>Requests will appear here when tenants text the Wren SMS number</div>
+        </div>
+      </div>
+    ) : maintenance.map(m => {
+      const isUrgent = m.priority === 'urgent';
+      const isOpen = m.status === 'open';
+      const isInProgress = m.status === 'in_progress';
+      const isResolved = m.status === 'resolved';
+      const borderColor = isUrgent ? theme.red : isOpen ? theme.amber : isInProgress ? theme.accent : theme.green;
+      const statusBg = isResolved ? theme.greenLight : isInProgress ? '#EFF6FF' : isUrgent ? theme.redLight : theme.amberLight;
+      const statusColor = isResolved ? theme.green : isInProgress ? theme.accent : isUrgent ? theme.red : theme.amber;
+      const statusLabel = isResolved ? '✓ Resolved' : isInProgress ? '↻ In Progress' : isUrgent ? '🚨 Urgent' : '⏳ Open';
+
+      return (
+        <div key={m.id} style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, borderLeft: `4px solid ${borderColor}`, padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: theme.text, marginBottom: 4 }}>{m.issue}</div>
+              <div style={{ fontSize: 11, color: theme.textMuted }}>
+                {new Date(m.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+            <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: statusBg, color: statusColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {statusLabel}
+            </span>
+          </div>
+          {m.thread && (
+            <div style={{ background: theme.bg, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: theme.textSecondary, lineHeight: 1.6, border: `1px solid ${theme.borderLight}` }}>
+              {m.thread}
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+)}
             </div>
           )}
         </div>
