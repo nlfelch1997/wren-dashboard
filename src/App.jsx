@@ -169,8 +169,8 @@ export default function App() {
   }
 
   const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0)
-  const expenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0)
-  const net = income - expenses
+  const expenses = Math.abs(transactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0))
+  const net = income - Math.abs(expenses)
   const pending = proposals.filter(p => p.status === 'pending')
   const approved = proposals.filter(p => p.status === 'approved')
   const strProps = properties.filter(p => p.type === 'STR')
@@ -354,7 +354,7 @@ export default function App() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                             <Badge type={p.type} />
-                            <div style={{ fontSize: 14, fontWeight: 800, color: theme.accent, whiteSpace: 'nowrap' }}>${p.base_nightly_rate}<span style={{ fontSize: 10, color: theme.textMuted, fontWeight: 400 }}>/nt</span></div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: theme.accent, whiteSpace: 'nowrap' }}>{p.type === 'LTR' ? '-' : `$${p.base_nightly_rate}`}<span style={{ fontSize: 10, color: theme.textMuted, fontWeight: 400 }}>{p.type === 'LTR' ? '' : '/nt'}</span></div>
                           </div>
                         </div>
                       ))}
@@ -443,14 +443,14 @@ export default function App() {
                             <Badge type={p.type} />
                           </div>
                           <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
-                            ${p.base_nightly_rate}<span style={{ fontSize: 12, fontWeight: 400, color: 'rgba(255,255,255,0.4)' }}>/night</span>
+                            {p.type === 'LTR' ? 'Long-term Rental' : `$${p.base_nightly_rate}`}<span style={{ fontSize: 12, fontWeight: 400, color: 'rgba(255,255,255,0.4)' }}>{p.type === 'LTR' ? '' : '/night'}</span>
                           </div>
                         </div>
                         <div style={{ padding: '14px 16px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                             {[
-                              { label: 'Min', value: `$${p.min_rate}/nt`, icon: '⬇️' },
-                              { label: 'Max', value: `$${p.max_rate}/nt`, icon: '⬆️' },
+                             { label: 'Min', value: p.type === 'LTR' ? 'N/A' : `$${p.min_rate}/nt`, icon: '⬇️' },
+{ label: 'Max', value: p.type === 'LTR' ? 'N/A' : `$${p.max_rate}/nt`, icon: '⬆️' },
                               { label: 'Cleaner', value: p.cleaner_name || 'Not set', icon: '🧹' },
                               { label: 'Type', value: p.management_type || 'Own', icon: '🏷️' },
                             ].map(item => (
