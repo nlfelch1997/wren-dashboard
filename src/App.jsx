@@ -135,6 +135,9 @@ export default function App() {
   const [proposals, setProposals] = useState([])
   const [transactions, setTransactions] = useState([])
   const [maintenance, setMaintenance] = useState([])
+  const [showTxForm, setShowTxForm] = useState(false)
+  const [txForm, setTxForm] = useState({ type: 'expense', amount: '', description: '', category: 'other', transaction_date: new Date().toISOString().split('T')[0], property_id: '' })
+const [txSaving, setTxSaving] = useState(false)
   const [activePage, setActivePage] = useState('dashboard')
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -149,7 +152,8 @@ export default function App() {
       supabase.from('properties').select('*'),
       supabase.from('pricing_proposals').select('*'),
       supabase.from('transactions').select('*'),
-    supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }),
+    supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }
+    ),
     ])
     setProperties(p.data || [])
     setProposals(pr.data || [])
@@ -157,6 +161,25 @@ export default function App() {
     setMaintenance(mx.data || [])
     setLoading(false)
   }
+
+  const addTransaction = async () => {
+  const propertyId = txForm.property_id || properties[0]?.id
+  if (!txForm.amount || !txForm.description) return
+  setTxSaving(true)
+  const { error } = await supabase.from('transactions').insert([{
+    ...txForm,
+    property_id: propertyId,
+    amount: parseFloat(txForm.amount),
+    deductible: txForm.type === 'expense'
+  }])
+  if (error) {
+    alert('Error saving: ' + error.message)
+  }
+  setShowTxForm(false)
+  setTxSaving(false)
+  setTxForm({ type: 'expense', amount: '', description: '', category: 'other', transaction_date: new Date().toISOString().split('T')[0], property_id: '' })
+  fetchAll()
+}
 
   async function handleProposal(id, status) {
     const { error } = await supabase
@@ -475,6 +498,66 @@ export default function App() {
               {/* INCOME & TAX */}
               {activePage === 'income' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+  <button onClick={() => setShowTxForm(true)} style={{ background: theme.accent, color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+    + Add Transaction
+  </button>
+</div>
+
+{showTxForm && (
+  <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: '20px 20px' }}>
+    <div style={{ fontSize: 15, fontWeight: 700, color: theme.text, marginBottom: 16 }}>Add Transaction</div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div>
+        <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 4, fontWeight: 600 }}>TYPE</div>
+        <select value={txForm.type} onChange={e => setTxForm({...txForm, type: e.target.value})} style={{ width: '100%', padding: '9px 10px', borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text, fontSize: 13 }}>
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 4, fontWeight: 600 }}>AMOUNT</div>
+        <input type="number" placeholder="0.00" value={txForm.amount} onChange={e => setTxForm({...txForm, amount: e.target.value})} style={{ width: '100%', padding: '9px 10px', borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text, fontSize: 13 }} />
+      </div>
+      <div style={{ gridColumn: '1 / -1' }}>
+        <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 4, fontWeight: 600 }}>DESCRIPTION</div>
+        <input type="text" placeholder="e.g. Cleaning fee - Rosa M." value={txForm.description} onChange={e => setTxForm({...txForm, description: e.target.value})} style={{ width: '100%', padding: '9px 10px', borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text, fontSize: 13 }} />
+      </div>
+      <div>
+        <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 4, fontWeight: 600 }}>CATEGORY</div>
+        <select value={txForm.category} onChange={e => setTxForm({...txForm, category: e.target.value})} style={{ width: '100%', padding: '9px 10px', borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text, fontSize: 13 }}>
+          <option value="rental_income">Rental Income</option>
+          <option value="cleaning">Cleaning</option>
+          <option value="supplies">Supplies</option>
+          <option value="maintenance">Maintenance</option>
+          <option value="insurance">Insurance</option>
+          <option value="platform_fees">Platform Fees</option>
+          <option value="utilities">Utilities</option>
+          <option value="repairs">Repairs</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 4, fontWeight: 600 }}>DATE</div>
+        <input type="date" value={txForm.transaction_date} onChange={e => setTxForm({...txForm, transaction_date: e.target.value})} style={{ width: '100%', padding: '9px 10px', borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text, fontSize: 13 }} />
+      </div>
+      <div style={{ gridColumn: '1 / -1' }}>
+        <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 4, fontWeight: 600 }}>PROPERTY</div>
+        <select value={txForm.property_id} onChange={e => setTxForm({...txForm, property_id: e.target.value})} style={{ width: '100%', padding: '9px 10px', borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text, fontSize: 13 }}>
+          {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </div>
+    </div>
+    <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
+      <button onClick={() => setShowTxForm(false)} style={{ background: theme.surface, color: theme.textSecondary, border: `1px solid ${theme.border}`, borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+        Cancel
+      </button>
+      <button onClick={addTransaction} disabled={txSaving} style={{ background: theme.accent, color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+        {txSaving ? 'Saving...' : 'Save Transaction'}
+      </button>
+    </div>
+  </div>
+)}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
                     <MetricCard label="Gross Income" value={`$${income.toLocaleString()}`} sub="Total recorded" color={theme.green} icon="📈" />
                     <MetricCard label="Total Expenses" value={`$${expenses.toLocaleString()}`} sub="Total recorded" color={theme.red} icon="📉" />
