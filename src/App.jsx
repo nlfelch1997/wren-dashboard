@@ -224,16 +224,36 @@ const [clients, setClients] = useState([])
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (session) {
+      fetchAll()
+    }
+  }, [selectedClient])
+
   async function fetchAll() {
     setLoading(true)
-    const [p, pr, tx, mx] = await Promise.all([
-      supabase.from('properties').select('*'),
-      supabase.from('pricing_proposals').select('*'),
-      supabase.from('transactions').select('*'),
-    supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }
-    ),
+    
+    let propertiesQuery = supabase.from('properties').select('*')
+    if (selectedClient) {
+      propertiesQuery = propertiesQuery.eq('user_id', selectedClient)
+    }
+    
+    const { data: propData } = await propertiesQuery
+    const propertyIds = (propData || []).map(p => p.id)
+    
+    const [pr, tx, mx] = await Promise.all([
+      propertyIds.length > 0
+        ? supabase.from('pricing_proposals').select('*').in('property_id', propertyIds)
+        : supabase.from('pricing_proposals').select('*'),
+      propertyIds.length > 0
+        ? supabase.from('transactions').select('*').in('property_id', propertyIds)
+        : supabase.from('transactions').select('*'),
+      propertyIds.length > 0
+        ? supabase.from('maintenance_requests').select('*').in('property_id', propertyIds).order('created_at', { ascending: false })
+        : supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }),
     ])
-    setProperties(p.data || [])
+    
+    setProperties(propData || [])
     setProposals(pr.data || [])
     setTransactions(tx.data || [])
     setMaintenance(mx.data || [])
