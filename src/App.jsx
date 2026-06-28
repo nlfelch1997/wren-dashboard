@@ -130,6 +130,64 @@ function EmptyState({ icon, title, sub }) {
   )
 }
 
+function LoginPage({ onLogin }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#EEF1F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 400, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: '1px solid #E2E8F0' }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #1D4ED8, #7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, margin: '0 auto 16px' }}>🦅</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: '#0F172A', letterSpacing: -0.5 }}>Wren</div>
+          <div style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>Sign in to your account</div>
+        </div>
+        {error && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#EF4444' }}>
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>EMAIL</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              placeholder="you@email.com"
+              style={{ width: '100%', padding: '11px 14px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, color: '#0F172A', background: '#F8FAFC', outline: 'none' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>PASSWORD</label>
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)} required
+              placeholder="••••••••"
+              style={{ width: '100%', padding: '11px 14px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, color: '#0F172A', background: '#F8FAFC', outline: 'none' }}
+            />
+          </div>
+          <button
+            type="submit" disabled={loading}
+            style={{ background: 'linear-gradient(135deg, #1D4ED8, #7C3AED)', color: '#fff', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 4 }}
+          >
+            {loading ? 'Signing in...' : 'Sign in →'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
 export default function App() {
   const [properties, setProperties] = useState([])
   const [proposals, setProposals] = useState([])
@@ -139,11 +197,31 @@ export default function App() {
   const [txForm, setTxForm] = useState({ type: 'expense', amount: '', description: '', category: 'other', transaction_date: new Date().toISOString().split('T')[0], property_id: '' })
 const [txSaving, setTxSaving] = useState(false)
   const [activePage, setActivePage] = useState('dashboard')
+  const [session, setSession] = useState(null)
+const [userRole, setUserRole] = useState(null)
+const [selectedClient, setSelectedClient] = useState(null)
+const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
-    fetchAll()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      if (session) {
+        fetchUserRole(session.user.id)
+        fetchAll()
+      }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (session) {
+        fetchUserRole(session.user.id)
+        fetchAll()
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   async function fetchAll() {
@@ -160,6 +238,21 @@ const [txSaving, setTxSaving] = useState(false)
     setTransactions(tx.data || [])
     setMaintenance(mx.data || [])
     setLoading(false)
+  }
+  async function fetchUserRole(userId) {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .single()
+    setUserRole(data?.role || 'client')
+    
+    if (data?.role === 'admin') {
+      const { data: clientData } = await supabase
+        .from('tenants')
+        .select('*')
+      setClients(clientData || [])
+    }
   }
 
   const addTransaction = async () => {
@@ -213,6 +306,10 @@ const [txSaving, setTxSaving] = useState(false)
     setDrawerOpen(false)
   }
 
+  if (!session) {
+    return <LoginPage />
+  }
+
   return (
     <>
       <style>{css}</style>
@@ -237,15 +334,29 @@ const [txSaving, setTxSaving] = useState(false)
 
           {/* Right — pending + add */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {userRole === 'admin' && clients.length > 0 && (
+              <select
+                value={selectedClient || ''}
+                onChange={e => setSelectedClient(e.target.value || null)}
+                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', borderRadius: 10, height: 40, padding: '0 10px' }}
+              >
+                <option value="">All Clients</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
             {pending.length > 0 && (
               <div onClick={() => navigate('proposals')} style={{ background: theme.amberLight, border: `1px solid ${theme.amberBorder}`, color: '#92400E', fontSize: 11, padding: '5px 10px', borderRadius: 20, cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
                 ⏳ {pending.length}
               </div>
             )}
             <button onClick={fetchAll} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontSize: 16, cursor: 'pointer', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↻</button>
+            <button onClick={() => supabase.auth.signOut()} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontSize: 11, cursor: 'pointer', borderRadius: 10, padding: '0 12px', height: 40, fontWeight: 600 }}>
+              Sign out
+            </button>
           </div>
         </div>
-
         {/* ── DRAWER OVERLAY ── */}
         {drawerOpen && (
           <>
